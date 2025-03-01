@@ -70,9 +70,13 @@ public class RateLimitMiddleware
     /// </summary>
     private void AddRateLimitHeaders(HttpContext context)
     {
-        context.Response.Headers.Add("X-Rate-Limit-Limit", _ipRateLimitOptions.GeneralRules[0].Limit);
-        var period = _ipRateLimitOptions.GeneralRules[0].Period;
-        var periodTimespan = period.ToTimeSpan();
-        context.Response.Headers.Add("X-Rate-Limit-Period", $"{periodTimespan.TotalSeconds} saniye");
+        if (_ipRateLimitOptions.GeneralRules.Count > 0)
+        {
+            context.Response.Headers["X-Rate-Limit-Limit"] = _ipRateLimitOptions.GeneralRules[0].Limit;
+            
+            var period = _ipRateLimitOptions.GeneralRules[0].Period;
+            var periodTimespan = period.ToTimeSpan();
+            context.Response.Headers["X-Rate-Limit-Period"] = $"{periodTimespan.TotalSeconds} saniye";
+        }
     }
 }

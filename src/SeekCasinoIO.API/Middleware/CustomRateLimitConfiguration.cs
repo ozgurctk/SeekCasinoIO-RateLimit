@@ -71,4 +71,34 @@ public class ClientQueryStringResolveContributor : IClientResolveContributor
 
         return null;
     }
+
+    /// <summary>
+    /// IClientResolveContributor arabiriminin async metodunu implemente eder
+    /// </summary>
+    public Task<string?> ResolveClientAsync(HttpContext httpContext)
+    {
+        // X-API-KEY headerından client ID çözümlemesi
+        if (httpContext.Request.Headers.TryGetValue("X-API-KEY", out var apiKey))
+        {
+            return Task.FromResult<string?>(apiKey.ToString());
+        }
+        
+        // Query stringden client ID çözümlemesi
+        if (httpContext.Request.Query.TryGetValue("apiKey", out var queryApiKey))
+        {
+            return Task.FromResult<string?>(queryApiKey.ToString());
+        }
+
+        // Giriş yapmış kullanıcı varsa kullanıcı ID'si
+        if (httpContext.User?.Identity?.IsAuthenticated == true)
+        {
+            var userIdClaim = httpContext.User.Claims.FirstOrDefault(c => c.Type == "sub");
+            if (userIdClaim != null)
+            {
+                return Task.FromResult<string?>($"user-{userIdClaim.Value}");
+            }
+        }
+
+        return Task.FromResult<string?>(null);
+    }
 }

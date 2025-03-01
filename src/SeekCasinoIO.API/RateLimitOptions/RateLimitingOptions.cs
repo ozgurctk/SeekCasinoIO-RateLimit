@@ -1,5 +1,6 @@
 using AspNetCoreRateLimit;
 using Microsoft.Extensions.Options;
+using SeekCasinoIO.API.Attributes;
 
 namespace SeekCasinoIO.API.RateLimitOptions;
 
@@ -25,10 +26,16 @@ public static class RateLimitingOptions
         services.AddInMemoryRateLimiting();
 
         // Rate limit için gerekli servislerin eklenmesi
-        services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+        services.AddSingleton<IRateLimitConfiguration, CustomRateLimitConfiguration>();
         
         // RateLimit counters and rules işleyicileri için bellek önbelleklemesi
         services.AddMemoryCache();
+
+        // Özelleştirilmiş rate limit konfigürasyon yükleyicisi
+        services.AddTransient<CustomRateLimitConfigurationLoader>();
+
+        // Uygulama başlangıcında çalıştırılacak attribute rate limit yükleyicisi
+        services.AddHostedService<RateLimitAttributeLoader>();
 
         return services;
     }
@@ -45,5 +52,41 @@ public static class RateLimitingOptions
         app.UseClientRateLimiting();
 
         return app;
+    }
+}
+
+/// <summary>
+/// Uygulama başlangıcında tüm controller'ları tarayarak CustomRateLimit özniteliklerini yükler
+/// </summary>
+public class RateLimitAttributeLoader : IHostedService
+{
+    private readonly IServiceProvider _serviceProvider;
+    
+    public RateLimitAttributeLoader(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+    }
+    
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        // Servis scope'u oluştur
+        using var scope = _serviceProvider.CreateScope();
+        
+        // CustomRateLimitConfigurationLoader servisini al
+        var loader = scope.ServiceProvider.GetRequiredService<CustomRateLimitConfigurationLoader>();
+        
+        // Tüm uygulamadaki assembly'leri al
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => a.FullName?.StartsWith("SeekCasinoIO") == true);
+        
+        // CustomRateLimit özniteliklerini yükle
+        loader.LoadRules(assemblies);
+        
+        return Task.CompletedTask;
+    }
+    
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
     }
 }
